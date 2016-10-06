@@ -1,0 +1,74 @@
+---
+title: "PAWS_PC_Genetic_ethnicity"
+author: "Rachel D Edgar"
+date: "10/6/2016"
+output: html_document
+---
+# PCA clustering of Genetic Ancestry
+## Interesting but PLINK is our standard
+
+### Reshape the data for use in making PCA cluseting calls 
+
+Cluster into genotypes
+```{r}
+load("~/bootcamp/PsychChip/PAWS_snps_Ballelefreq.RData")
+
+#read in meta data
+load("~/bootcamp/PsychChip/PAWS_meta_sentrix_genetic_clusters.RData")
+
+# Remove NAs (if any) with complete.cases for PCA
+SNPs<-PAWS_snps_casted[complete.cases(PAWS_snps_casted),2:ncol(PAWS_snps_casted)] #554034 SNPs
+meta_ordered<-meta[which(meta$PAWSG_ID%in%colnames(SNPs)),]
+meta_ordered<-meta_ordered[match(colnames(SNPs), meta_ordered$PAWSG_ID),]
+```
+
+
+This code runs PCA based genetic cluster calling as in Solovieff BMC genetics 2010
+```{r}
+###PCA then K-means clustering
+PCA_full<-princomp(SNPs)
+loadings<-as.data.frame(unclass(PCA_full$loadings))
+vars <- PCA_full$sdev^2
+Importance<-vars/sum(vars) 
+
+## scree
+pca_df<-data.frame(Importance=Importance, PC=seq(1:length(Importance))) #75% of variance accounted for by PC 1
+ggplot(pca_df[which(pca_df$PC<21),],aes(PC,Importance))+geom_bar(stat = "identity",color="black",fill="grey")+theme_bw()+
+  theme(axis.text = element_text(size =12),
+        axis.title = element_text(size =15))+ylab("Variance")+
+  scale_x_continuous(breaks = seq(1,20,1))
+
+
+# which PCs important to ethniccity
+X <- cbind(PCA_full$loadings[,1]) ## only pulled PC 1 for Kmeans clustering because accounted for 75% of the variance
+# could have c binded like 10 PCs if they showed variance
+
+#k-means clustering using principal components to determine the number of clusters to pull
+wss <- (nrow((X))-1)*sum(apply((X),2,var))
+for (i in 2:15) wss[i] <- sum(kmeans((X), 
+                                     centers=i)$withinss)
+clust_num<-data.frame(wss=wss, clust_num=1:15)
+#elbow at 4 clusters
+ggplot(clust_num, aes(clust_num, wss))+geom_line(color="grey60")+geom_point(shape=19, size=2,color="grey60")+
+  theme_bw()+ylab("Within groups sum of squares")+xlab("Number of Clusters")
+
+# so pull the 4th cluster from k means clustering 
+cl <- kmeans(X,4)
+
+loadings$cluster<-cl$cluster
+
+## plot the loadings to compare the PC cluster to the reported ethnicity
+clustered<-ggplot(loadings,aes(Comp.1,Comp.2, color=as.factor(cluster)))+
+  geom_point(shape=19, size=3)+theme_bw()+scale_color_discrete(name="Genetic Cluster")
+reported<-ggplot(loadings,aes(Comp.1,Comp.2, color=as.factor(meta_ordered$DECHIETH)))+
+  geom_point(shape=19, size=3)+theme_bw()+scale_color_discrete(name="Reported Ethnicity")
+grid.arrange(clustered, reported, ncol=1,  heights = c(4, 4))
+
+#compare clustering types results (heriarchical and kmeans), just kmeans on the snp data how different?
+```
+
+## add PC to meta data
+```{r}
+meta_ordered$PC1<-loadings$Comp.1
+meta_ordered$PC2<-loadings$Comp.2
+```
