@@ -31,3 +31,4 @@ impute2 \
 -buffer 250 \
 -o PAWS_psychchip_chr${CHR}.flipped.phased.imputed.${START}.${STOP} ${OPTION}
 
+
