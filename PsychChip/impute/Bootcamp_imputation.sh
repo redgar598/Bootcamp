@@ -14,6 +14,8 @@
 
 ## built using https://github.com/Chris1221/impute as a guide
 
+### need to recode AB calls to AGCT for matching 1000 genomes
+Recode_for_phasing.R
 
 #You must split the dataset by chromosomes prior to phasing since SHAPEIT phases only one chromosome at a time. To do so, you can use the following Plink command for example:
 
@@ -35,7 +37,7 @@ done
 
 ## need to remove the duplicates with an exm name
 #This creates a file named exclude_snp_list.txt
-remove_dup.R
+Rscript remove_dups.R
 
 ## will need to re split after removing duplicates so delete these files
 rm PAWS_snps_filtered_recoded*chr*
@@ -162,6 +164,9 @@ do
     ls | grep "_chr${CHR}.flipped" | xargs -d"\n" cat > ../final/PAWS_psychchip_chr${CHR}.gen
 done
 
+#move directory
+cd ../final
+
 
 ## quality control (info score of at least 0.8, HWE p-value not lower than e-05)
 for chr in $(seq 1 20)
@@ -173,14 +178,22 @@ done
 ## Convert to ped and map (using a probabiliy threshold of 90%)
 for chr in $(seq 1 20)
 do
-gtool -G --g PAWS_psychchip_chr${chr}.imputed.QC.gen --chr ${chr} --s ~/bootcamp/PsychChip/impute/PAWS_snps_filtered_recoded.chr${chr}.phased.with.ref.sample --ped PAWS_snps_imputed_QC.chr${chr}.ped --map PAWS_snps_imputed_QC.chr${chr}.map --snp --threshold 0.9
+gtool -G --g PAWS_psychchip_chr${chr}.imputed.QC.gen --chr ${chr} --s ~/bootcamp/PsychChip/impute/PAWS_snps_filtered_recoded.chr${chr}.phased.with.ref.sample --ped PAWS_snps_imputed_QC.chr${chr}.ped --map PAWS_snps_imputed_QC.chr${chr}.map --threshold 0.9
 done
 
 
 
+# convert to bed and then lgen so can bring bim into R
 
+for chr in $(seq 1 22); do
+    plink --noweb --file PAWS_snps_imputed_QC.chr$chr --out PAWS_snps_imputed_QC.chr$chr --make-bed ;
+done
 
+for chr in $(seq 1 22); do
+    plink --noweb --bfile PAWS_snps_imputed_QC.chr$chr --recode-lgen --out PAWS_snps_imputed_QC_recode.chr$chr ;
+done
 
+mkdir mQTL_results
 
-
-
+## perform mQTL analysis in R
+Rscript ~/bootcamp/mQTL/PAWS_mQTL.R
